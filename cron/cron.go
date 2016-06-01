@@ -19,33 +19,23 @@ type Cron struct {
 	ErrorLog *log.Logger
 }
 
-// Job is an interface for submitted cron jobs.
+// Job Job接口.
 type Job interface {
 	Run()
 }
 
-// The Schedule describes a job's duty cycle.
+// Schedule 描述了Job的执行计划.
 type Schedule interface {
-	// Return the next activation time, later than the given time.
-	// Next is invoked initially, and then each time the job is run.
+	// 返回比参数时间晚的下次执行时间.初始化的时候和每次执行Job的时候执行.
 	Next(time.Time) time.Time
 }
 
-// Entry consists of a schedule and the func to execute on that schedule.
+// Entry 包装执行计划和Job的实体类.
 type Entry struct {
-	// The schedule on which this job should be run.
-	Schedule Schedule
-
-	// The next time the job will run. This is the zero time if Cron has not been
-	// started or this entry's schedule is unsatisfiable
-	Next     time.Time
-
-	// The last time this job was run. This is the zero time if the job has never
-	// been run.
-	Prev     time.Time
-
-	// The Job to run.
-	Job      Job
+	Schedule Schedule  // Job的执行计划.
+	Next     time.Time // Job下次运行的时间,如果没有运行过或者执行计划无法满足则为0.
+	Prev     time.Time // 上一次执行的时间,如果没有执行过,则为0.
+	Job      Job       // 要运行的Job
 }
 
 // byTime is a wrapper for sorting the entry array by time
@@ -71,7 +61,7 @@ func (s byTime) Less(i, j int) bool {
 	return s[i].Next.Before(s[j].Next)
 }
 
-// New returns a new Cron job runner.
+// New 返回一个新建的Cron job runner
 func New() *Cron {
 	return &Cron{
 		entries:  nil,
@@ -90,12 +80,12 @@ func (f FuncJob) Run() {
 	f()
 }
 
-// AddFunc adds a func to the Cron to be run on the given schedule.
+// AddFunc 添加Job函数和执行计划到Cron
 func (c *Cron) AddFunc(spec string, cmd func()) error {
 	return c.AddJob(spec, FuncJob(cmd))
 }
 
-// AddJob adds a Job to the Cron to be run on the given schedule.
+// AddJob 添加Job和执行计划到Cron
 func (c *Cron) AddJob(spec string, cmd Job) error {
 	schedule, err := Parse(spec)
 	if err != nil {
@@ -105,7 +95,7 @@ func (c *Cron) AddJob(spec string, cmd Job) error {
 	return nil
 }
 
-// Schedule adds a Job to the Cron to be run on the given schedule.
+// Schedule 添加Job和执行计划到Cron.
 func (c *Cron) Schedule(schedule Schedule, cmd Job) {
 	entry := &Entry{
 		Schedule: schedule,
@@ -115,7 +105,6 @@ func (c *Cron) Schedule(schedule Schedule, cmd Job) {
 		c.entries = append(c.entries, entry)
 		return
 	}
-
 	c.add <- entry
 }
 
@@ -123,13 +112,12 @@ func (c *Cron) Schedule(schedule Schedule, cmd Job) {
 func (c *Cron) Entries() []*Entry {
 	if c.running {
 		c.snapshot <- nil
-		x := <-c.snapshot
-		return x
+		return <-c.snapshot
 	}
 	return c.entrySnapshot()
 }
 
-// Start the cron scheduler in its own go-routine.
+// Start 在独立的go-routine内启动任务
 func (c *Cron) Start() {
 	c.running = true
 	go c.run()
@@ -150,7 +138,7 @@ func (c *Cron) runWithRecovery(j Job) {
 // Run the scheduler.. this is private just due to the need to synchronize
 // access to the 'running' state variable.
 func (c *Cron) run() {
-	// Figure out the next activation times for each entry.
+	// 指出每个entry的下次激活时间.
 	now := time.Now().Local()
 	for _, entry := range c.entries {
 		entry.Next = entry.Schedule.Next(now)
@@ -198,7 +186,7 @@ func (c *Cron) run() {
 	}
 }
 
-// Logs an error to stderr or to the configured error log
+// logf 输出日志到stderr或者配置的日志文件内.
 func (c *Cron) logf(format string, args ...interface{}) {
 	if c.ErrorLog != nil {
 		c.ErrorLog.Printf(format, args...)
@@ -207,7 +195,7 @@ func (c *Cron) logf(format string, args ...interface{}) {
 	}
 }
 
-// Stop stops the cron scheduler if it is running; otherwise it does nothing.
+// Stop 如果任务正在运行,停止. 否则什么也不做.
 func (c *Cron) Stop() {
 	if !c.running {
 		return
@@ -216,7 +204,7 @@ func (c *Cron) Stop() {
 	c.running = false
 }
 
-// entrySnapshot returns a copy of the current cron entry list.
+// entrySnapshot 返回定期Cron Entry List的一个拷贝,非深度拷贝???
 func (c *Cron) entrySnapshot() []*Entry {
 	entries := []*Entry{}
 	for _, e := range c.entries {
