@@ -8,14 +8,14 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-const ONE_SECOND = 1 * time.Second + 10 * time.Millisecond
+const ONESECOND = 1 * time.Second + 10 * time.Millisecond
 
-func TestFuncJob_Run(t *testing.T) {
+func TestFuncJobRun(t *testing.T) {
 	Convey("测试启动Job", t, func() {
 		cron := cron.New()
 		cron.Start()
 		select {
-		case <-time.After(ONE_SECOND):
+		case <-time.After(ONESECOND):
 			t.FailNow()
 		case <-stop(cron):
 		}
